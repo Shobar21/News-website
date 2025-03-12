@@ -4,70 +4,77 @@ import PropTypes from 'prop-types'
 
 export default class News extends Component {
   static defaultProps = {
-    country: 'in',
-    pagesize: 6,
-    category: 'general',
+    country: 'us',
+    pageSize: 6,
+    category: 'health',
   }
+
   static propTypes = {
     country: PropTypes.string,
-    pagesize: PropTypes.number,
+    pageSize: PropTypes.number,
     category: PropTypes.string,
   }
-  constructor() {
-    super()
+
+  constructor(props) {
+    super(props)
     this.state = {
-      article: [], // Initialize as an empty array
-      loading: true, // Set loading to true initially
+      articles: [],
+      loading: true,
       page: 1,
+      totalResults: 0,
     }
   }
-  async componentDidMount() {
-    let url = `https://newsapi.org/v2/top-headlines?country=${this.props.country}&category=${this.props.category}&apiKey=ec1ed968fee842d2a8e20cc2f871f815&page=1&pageSize=${this.props.pagesize}`
-    let data = await fetch(url)
-    let parsedData = await data.json()
-    console.log(parsedData)
-    this.setState({
-      article: parsedData.articles,
-      loading: false, // Set loading to false after data is fetched
-      totalResults: parsedData.totalResults,
-    })
+
+  async fetchNews(page = 1) {
+    this.setState({ loading: true })
+    try {
+      let url = `https://newsapi.org/v2/top-headlines?country=${this.props.country}&category=${this.props.category}&apiKey=1f322555666d4c5085bf25639a37fc8a&page=${page}&pageSize=${this.props.pageSize}`
+      let response = await fetch(url)
+      let data = await response.json()
+      console.log('Country:', this.props.country)
+      console.log('Category:', this.props.category)
+
+      if (data.articles) {
+        this.setState({
+          articles: data.articles,
+          loading: false,
+          page: page,
+          totalResults: data.totalResults || 0,
+        })
+      } else {
+        this.setState({ articles: [], loading: false })
+      }
+    } catch (error) {
+      console.error('Error fetching news:', error)
+      this.setState({ articles: [], loading: false })
+    }
   }
-  handlePrevClick = async () => {
-    let url = `https://newsapi.org/v2/top-headlines?country=${
-      this.props.country
-    }&category=${
-      this.props.category
-    }&apiKey=ec1ed968fee842d2a8e20cc2f871f815&page=${
-      this.state.page - 1
-    }&pageSize=${this.props.pagesize}`
-    let data = await fetch(url)
-    let parsedData = await data.json()
-    console.log(parsedData)
-    this.setState({
-      page: this.state.page - 1,
-      article: parsedData.articles,
-    })
+
+  componentDidMount() {
+    this.fetchNews(1)
   }
-  handleNextClick = async () => {
+
+  componentDidUpdate(prevProps) {
     if (
-      this.state.page + 1 >
-      Math.ceil(this.state.totalResults / this.props.pagesize)
+      prevProps.category !== this.props.category ||
+      prevProps.country !== this.props.country
     ) {
-    } else {
-      let url = `https://newsapi.org/v2/top-headlines?country=${
-        this.props.country
-      }&category=${
-        this.props.category
-      }&apiKey=ec1ed968fee842d2a8e20cc2f871f815&page=${
-        this.state.page + 1
-      }&pageSize=${this.props.pagesize}`
-      let data = await fetch(url)
-      let parsedData = await data.json()
-      console.log(parsedData)
-      this.setState({
-        page: this.state.page + 1,
-        article: parsedData.articles,
-      })
+      this.fetchNews(1)
+    }
+  }
+
+  handlePrevClick = () => {
+    if (this.state.page > 1) {
+      this.fetchNews(this.state.page - 1)
+    }
+  }
+
+  handleNextClick = () => {
+    if (
+      this.state.page + 1 <=
+      Math.ceil(this.state.totalResults / this.props.pageSize)
+    ) {
+      this.fetchNews(this.state.page + 1)
     }
   }
 
@@ -75,46 +82,60 @@ export default class News extends Component {
     return (
       <div className='container my-3'>
         <h1 className='text-center' style={{ margin: '35px 0px' }}>
-          {' '}
-          Top Headlines
+          Top Headlines -{' '}
+          {this.props.category.charAt(0).toUpperCase() +
+            this.props.category.slice(1)}
         </h1>
-        <div className='row'>
-          {this.state.article.map((element) => {
-            return (
-              <div className='col-md-4' key={element.url}>
+
+        {this.state.loading ? (
+          <h2 className='text-center'>Loading news...</h2>
+        ) : this.state.articles.length === 0 ? (
+          <h2 className='text-center'>No articles found</h2>
+        ) : (
+          <div className='row'>
+            {this.state.articles.map((article) => (
+              <div className='col-md-4' key={article.url}>
                 <NewsItem
-                  title={element.title ? element.title.slice(0, 73) : ' '}
-                  description={
-                    element.description ? element.description.slice(0, 96) : ' '
+                  title={
+                    article.title ? article.title.slice(0, 73) : 'No Title'
                   }
-                  imageUrl={element.urlToImage}
-                  newsUrl={element.url}
-                  author={element.author}
-                  date={element.publishedAt}
+                  description={
+                    article.description
+                      ? article.description.slice(0, 96)
+                      : 'No Description'
+                  }
+                  imageUrl={
+                    article.urlToImage || 'https://via.placeholder.com/150'
+                  }
+                  newsUrl={article.url}
+                  author={article.author || 'Unknown'}
+                  date={new Date(article.publishedAt).toLocaleString()}
                 />
               </div>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+        )}
+
         <div className='container d-flex justify-content-between'>
           <button
             type='button'
             disabled={this.state.page <= 1}
-            class='btn btn-primary'
+            className='btn btn-primary'
             onClick={this.handlePrevClick}
           >
             &larr; Previous
           </button>
+
           <button
             type='button'
             disabled={
               this.state.page + 1 >
-              Math.ceil(this.state.totalResults / this.props.pagesize)
+              Math.ceil(this.state.totalResults / this.props.pageSize)
             }
-            class='btn btn-primary'
+            className='btn btn-primary'
             onClick={this.handleNextClick}
           >
-            Next &larr;
+            Next &rarr;
           </button>
         </div>
       </div>
